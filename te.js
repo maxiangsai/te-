@@ -1,4 +1,4 @@
-; (function (window, document, undefined) {
+;(function (window, document, undefined) {
     "use strict";
 
     var te$ = window.te$ || {};
@@ -145,12 +145,28 @@
      * queryString(key=value&...)
      */
     te$.jsonToUrl = function (data) {
-        var params = [];
-        for (var k in data) {
-            var value = data[k] !== undefined ? data[k] : '';
-            params.push(k + '=' + value)
+        var url = '';
+        for (var key in data) {
+            var value = data[key] !== undefined ? data[key] : '';
+            url += '&'+ key + '=' + encodeURIComponent(value)
         }
-        return params.join('&')
+        return url ? url.substring(1) : ''
+    }
+
+    te$.formatTime = function(date) {
+        const year = date.getFullYear()
+        const month = date.getMonth() + 1
+        const day = date.getDate()
+        const hour = date.getHours()
+        const minute = date.getMinutes()
+        const second = date.getSeconds()
+        
+        return [year, month, day].map(formatNumber).join('/') + ' ' + [hour, minute, second].map(formatNumber).join(':')
+    }
+      
+    function formatNumber (n) {
+        n = n.toString()
+        return n[1] ? n : '0' + n
     }
     // ---------------------- ajax --------------------------------
     var ajaxSettings = {
@@ -189,16 +205,21 @@
         var options = te$.extend({}, ajaxSettings, options || {}, true);
 
         var xhr = options.xhr(),
-            abortTimeout = null;
-
-        var postData = this.jsonToUrl(options.data);
+            abortTimeout = null,
+            postData = this.jsonToUrl(options.data);
 
         if (options.type.toUpperCase() === 'POST') {
             xhr.open(options.type, options.url, options.async);
             xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=utf-8');
             xhr.send(postData);
         } else if (options.type.toUpperCase() === 'GET') {
-            xhr.open(options.type, (options.url + '?' + postData), options.async);
+            
+            if(options.data === null || options.data === {}) {
+                xhr.open(options.type, options.url, options.async);
+            }else{
+                xhr.open(options.type, options.url += (options.url.indexOf('?') < 0 ? '?' : '&') + postData, options.async);
+            }
+            
             xhr.send(null);
         }
 
@@ -217,16 +238,16 @@
                 var res, error = false;
                 if ((xhr.status >= 200 && xhr.status < 300) || xhr.status == 304) {
                     // 304 重定向
-                    if (xhr.responseType == 'arraybuffer' || xhr.responseType == 'blob')
-                        res = xhr.response
+                    if (xhr.responseType == 'arraybuffer' || xhr.responseType == 'blob'){
+                        res = xhr.response;
+                    }
                     else {
                         res = xhr.responseText
                         try {
                             if (options.dataType == 'xml') res = xhr.responseXML
                             if (options.dataType == 'json') res = JSON.parse(res)
                         } catch (e) { error = e }
-
-                        if (error) return options.error(error, 'parsererror', xhr)
+                        if (error) {return options.error(error, 'parsererror', xhr)}
                     }
                     options.success(res, xhr)
                 } else {
