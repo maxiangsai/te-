@@ -1,9 +1,6 @@
 ;(function (window, document, undefined) {
     "use strict";
-
     var te$ = window.te$ || {};
-    
-    function empty() { }
     function isWindow(obj) { return obj != null && obj == obj.window }
     function isObject(obj) { return typeof (obj) == 'object' }
     function isPlainObject(obj) { return isObject(obj) && !isWindow(obj) && Object.getPrototypeOf(obj) == Object.prototype }
@@ -168,103 +165,6 @@
         n = n.toString()
         return n[1] ? n : '0' + n
     }
-    // ---------------------- ajax --------------------------------
-    var ajaxSettings = {
-        // 默认请求方式
-        type: 'GET',
-        url: '',
-        data: null,
-        dataType: 'json',
-        async: true,
-        xhr: function () {
-            if (XMLHttpRequest) {
-                return new window.XMLHttpRequest();
-            } else {
-                return new ActiveXObject('Microsoft.XMLHTTP');
-            }
-        },
-        // 发起请求之前触发(未完成)
-        beforeSend: empty,
-        // 成功回调（res, xhr）
-        success: empty,
-        // 失败回调 type: "timeout", "error", "abort", "parsererror" (statusText, type, xhr)
-        error: empty,
-        // 成功或者失败都触发(未完成)
-        complete: empty,
-        // 超时
-        timeout: 0,
-        // 是否对返回的数据进行缓存(未完成)
-        cache: true
-    }
-
-    /**
-     * ajax
-     * @param {object} options 
-     */
-    te$.ajax = function (options) {
-        var options = te$.extend({}, ajaxSettings, options || {}, true);
-
-        var xhr = options.xhr(),
-            abortTimeout = null,
-            postData = this.jsonToUrl(options.data);
-
-        if (options.type.toUpperCase() === 'POST') {
-            xhr.open(options.type, options.url, options.async);
-            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=utf-8');
-            xhr.send(postData);
-        } else if (options.type.toUpperCase() === 'GET') {
-            
-            if(options.data === null || options.data === {}) {
-                xhr.open(options.type, options.url, options.async);
-            }else{
-                xhr.open(options.type, options.url += (options.url.indexOf('?') < 0 ? '?' : '&') + postData, options.async);
-            }
-            
-            xhr.send(null);
-        }
-
-        xhr.onreadystatechange = function () {
-            /**
-             * 监听readyState改变
-             * 0: 请求初始化
-             * 1: 服务器连接已建立
-             * 2: 请求已接收
-             * 3: 请求处理中
-             * 4: 请求已完成
-             */
-            if (xhr.readyState == 4) {
-                xhr.onreadystatechange = empty;
-                clearTimeout(abortTimeout);
-                var res, error = false;
-                if ((xhr.status >= 200 && xhr.status < 300) || xhr.status == 304) {
-                    // 304 重定向
-                    if (xhr.responseType == 'arraybuffer' || xhr.responseType == 'blob'){
-                        res = xhr.response;
-                    }
-                    else {
-                        res = xhr.responseText
-                        try {
-                            if (options.dataType == 'xml') res = xhr.responseXML
-                            if (options.dataType == 'json') res = JSON.parse(res)
-                        } catch (e) { error = e }
-                        if (error) {return options.error(error, 'parsererror', xhr)}
-                    }
-                    options.success(res, xhr)
-                } else {
-                    options.error(xhr.statusText || null, xhr.status ? 'error' : 'abort', xhr)
-                }
-            }
-        }
-        if (options.timeout > 0) {
-            abortTimeout = setTimeout(function () {
-                xhr.onreadystatechange = empty;
-                xhr.abort(); // 终止请求
-                options.error(null, 'timeout', xhr);
-            }, options.timeout);
-        }
-
-
-    };
 
     /**
      * cookie的set and get
@@ -274,7 +174,7 @@
      * @returns {*}
      */
     te$.cookie = function (name, value, options) {
-        if (typeof value != 'undefined') { // name and value given, set cookie
+        if (typeof value != 'undefined') { // setCookie
             options = options || {};
             if (value === null) {
                 value = '';
@@ -315,14 +215,12 @@
     // --------------------------- extend ------------------------------
     function extend(target, source, deep) {
         for (var key in source) {
+            // 引用类型object, array, 深拷贝
             if (deep && (isPlainObject(source[key]) || te$.isArray(source[key]))) {
-                // 深拷贝
                 if (isPlainObject(source[key]) && !isPlainObject(target[key])) {
-                    // 源对象是obj而目标对象不是，则
                     target[key] = {}
                 }
                 if (te$.isArray(source[key]) && !te$.isArray(target[key])) {
-                    // 源对象是array而目标对象不是，则
                     target[key] = []
                 }
                 extend(target[key], source[key], deep) // 递归调用
@@ -337,22 +235,16 @@
 
     /**
      * 扩展Object
-     * @param {*} target 
+     * @param {*} target
      */
     te$.extend = function (target) {
-        // args除了第一个参数, 例如传入的参数为te$.extend({}, {name: 1}, {name: 2}, {name: 'ma'}, true)
+        // args为除了第一个参数te$.extend(target, {}, ..., deep)
         var deep, args = Array.prototype.slice.call(arguments, 1);
-        if (typeof target == 'boolean') {
-            // 将target值为undefined
+        if (typeof target == 'boolean') { // 兼容te$.extend(deep, target, {}, ...)
             deep = target
             target = args.shift()
         }
-
-        args.forEach(function (arg) {
-            // eg: args为({name: 1}, {name: 2}, {name: 'ma'}, true)
-            // arg为true时, 默认不处理
-            extend(target, arg, deep)
-        })
+        args.forEach(function (arg) {extend(target, arg, deep)})
         return target
     };
     window.te$ = te$;
